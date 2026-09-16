@@ -1,3 +1,4 @@
+#include <filesystem>
 #include <iostream>
 #include <gtk/gtk.h>
 
@@ -53,6 +54,32 @@ static void activate(GtkApplication* app, gpointer data) {
     gtk_window_present(gtkMainWindow_);
 }
 
+static void openFileCallback(GObject* object, GAsyncResult* result, gpointer data) {
+    GtkFileDialog* fileDialog = GTK_FILE_DIALOG(object);
+    if (fileDialog == nullptr) return;
+    GError* error = nullptr;
+    GFile* file = gtk_file_dialog_open_finish(fileDialog, result, &error);
+
+    char* path = nullptr;
+    if (file != nullptr) {
+        path = g_file_get_path(file);
+    }
+}
+
 void onClickMenu(GtkWidget *widget, gpointer data) {
-    g_print("aa");
+    auto* action = G_SIMPLE_ACTION(widget);
+    if (action == nullptr) return;
+
+    GtkFileDialog* fileDialog = gtk_file_dialog_new();
+
+    GListStore* listStore = g_list_store_new(GTK_TYPE_FILE_FILTER);
+    GtkFileFilter* fileFilter = gtk_file_filter_new();
+    gtk_file_filter_set_name(fileFilter, "テキストファイル");
+    gtk_file_filter_add_suffix(fileFilter, "txt");
+
+    g_list_store_append(listStore, fileFilter);
+
+    gtk_file_dialog_set_filters(fileDialog, G_LIST_MODEL(listStore));
+    gtk_file_dialog_open(fileDialog, gtkMainWindow_, nullptr, openFileCallback, nullptr);
+
 }
