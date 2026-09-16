@@ -98,7 +98,10 @@ void openFileDialog(OpenFileDialogType type) {
         if (file == nullptr) return;
         char* path = g_file_get_path(file);
         if (type == OpenFileDialogType::OPEN) {
-
+            std::string text = "";
+            std::ifstream inputFile(path);
+            inputFile >> text;
+            gtk_text_buffer_set_text(textBuffer_, text.data(), text.size());
         }
         else if (type == OpenFileDialogType::SAVE) {
             GtkTextIter startItr;
