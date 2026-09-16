@@ -1,17 +1,26 @@
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <gtk/gtk.h>
+#include <string>
 
 namespace {
     const int DEFAULT_WIDTH = 300, DEFAULT_HEIGHT = 300;
     GtkApplication* gtkApplication_ = nullptr;
     GtkWindow* gtkMainWindow_ = nullptr;
     GtkWidget* mainWindowWidget_ = nullptr;
+    GtkTextBuffer* textBuffer_ = nullptr;
+
+    enum class OpenFileDialogType {
+        OPEN,
+        SAVE
+    };
 }
 
 static void activate(GtkApplication* app, gpointer data);
 static void onClickMenu(GtkWidget* widget, gpointer data);
 static void onEvent(GtkWidget* widget, gpointer data);
+static void openFileDialog();
 
 // TIP コードを<b>Run</b>するには、<shortcut actionId="Run"/> を押すか、ガターにある <icon src="AllIcons.Actions.Execute"/> アイコンをクリックします。
 
@@ -34,10 +43,13 @@ static void activate(GtkApplication* app, gpointer data) {
 
     auto* actionGroup = g_simple_action_group_new();
     auto* openFileAction = g_simple_action_new("openFile", nullptr);
+    auto* saveAction = g_simple_action_new("save", nullptr);
     auto* closeAction = g_simple_action_new("close", nullptr);
     g_signal_connect(openFileAction, "activate", G_CALLBACK(onClickMenu), nullptr);
+    g_signal_connect(saveAction, "activate", G_CALLBACK(onClickMenu), nullptr);
     g_signal_connect(closeAction, "activate", G_CALLBACK(onClickMenu), nullptr);
     g_action_map_add_action(G_ACTION_MAP(actionGroup), G_ACTION(openFileAction));
+    g_action_map_add_action(G_ACTION_MAP(actionGroup), G_ACTION(saveAction));
     g_action_map_add_action(G_ACTION_MAP(actionGroup), G_ACTION(closeAction));
     gtk_widget_insert_action_group(mainWindowWidget_, "menu", G_ACTION_GROUP(actionGroup));
 
@@ -46,6 +58,7 @@ static void activate(GtkApplication* app, gpointer data) {
     GMenu* menu = g_menu_new();
     GMenu* fileMenu = g_menu_new();
     g_menu_append(fileMenu, "開く", "menu.openFile");
+    g_menu_append(fileMenu, "保存", "menu.save");
     g_menu_append(fileMenu, "閉じる", "menu.close");
 
     g_menu_append_submenu(menu, "ファイル", G_MENU_MODEL(fileMenu));
@@ -54,9 +67,9 @@ static void activate(GtkApplication* app, gpointer data) {
     gtk_box_append(GTK_BOX(vbox), menuBar);
 
     GtkWidget* textView = gtk_text_view_new();
-    auto* textBuffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(textView));
+    textBuffer_ = gtk_text_view_get_buffer(GTK_TEXT_VIEW(textView));
 
-    g_signal_connect(textBuffer, "insert-text", G_CALLBACK(onEvent), nullptr);
+    g_signal_connect(textBuffer_, "insert-text", G_CALLBACK(onEvent), nullptr);
     gtk_box_append(GTK_BOX(vbox), textView);
 
     gtk_window_set_child(gtkMainWindow_, vbox);
@@ -64,16 +77,42 @@ static void activate(GtkApplication* app, gpointer data) {
     gtk_window_present(gtkMainWindow_);
 }
 
-static void openFileCallback(GObject* object, GAsyncResult* result, gpointer data) {
-    GtkFileDialog* fileDialog = GTK_FILE_DIALOG(object);
-    if (fileDialog == nullptr) return;
-    GError* error = nullptr;
-    GFile* file = gtk_file_dialog_open_finish(fileDialog, result, &error);
+void openFileDialog(OpenFileDialogType type) {
+    GtkFileDialog* fileDialog = gtk_file_dialog_new();
 
-    char* path = nullptr;
-    if (file != nullptr) {
-        path = g_file_get_path(file);
-    }
+    GListStore* listStore = g_list_store_new(GTK_TYPE_FILE_FILTER);
+    GtkFileFilter* fileFilter = gtk_file_filter_new();
+    gtk_file_filter_set_name(fileFilter, "テキストファイル");
+    gtk_file_filter_add_suffix(fileFilter, "txt");
+
+    g_list_store_append(listStore, fileFilter);
+
+    gtk_file_dialog_set_filters(fileDialog, G_LIST_MODEL(listStore));
+    gtk_file_dialog_open(fileDialog, gtkMainWindow_, nullptr, [](GObject* object, GAsyncResult* result, gpointer data) {
+        GtkFileDialog* fileDialog = GTK_FILE_DIALOG(object);
+        if (fileDialog == nullptr) return;
+        GError* error = nullptr;
+        GFile* file = gtk_file_dialog_open_finish(fileDialog, result, &error);
+        OpenFileDialogType type = (OpenFileDialogType) GPOINTER_TO_INT(data);
+
+        if (file == nullptr) return;
+        char* path = g_file_get_path(file);
+        if (type == OpenFileDialogType::OPEN) {
+
+        }
+        else if (type == OpenFileDialogType::SAVE) {
+            GtkTextIter startItr;
+            gtk_text_buffer_get_start_iter(textBuffer_, &startItr);
+            GtkTextIter endItr;
+            gtk_text_buffer_get_end_iter(textBuffer_, &endItr);
+            char* text = gtk_text_buffer_get_text(textBuffer_, &startItr, &endItr, false);
+            //g_print(text);
+            std::ofstream outputFile(path);
+            outputFile << text;
+            g_print("Saved\n");
+        }
+
+    }, GINT_TO_POINTER((int)type));
 }
 
 void onClickMenu(GtkWidget *widget, gpointer data) {
@@ -83,17 +122,10 @@ void onClickMenu(GtkWidget *widget, gpointer data) {
     if (actionName == nullptr) return;
 
     if (g_str_equal(actionName, "openFile")) {
-        GtkFileDialog* fileDialog = gtk_file_dialog_new();
-
-        GListStore* listStore = g_list_store_new(GTK_TYPE_FILE_FILTER);
-        GtkFileFilter* fileFilter = gtk_file_filter_new();
-        gtk_file_filter_set_name(fileFilter, "テキストファイル");
-        gtk_file_filter_add_suffix(fileFilter, "txt");
-
-        g_list_store_append(listStore, fileFilter);
-
-        gtk_file_dialog_set_filters(fileDialog, G_LIST_MODEL(listStore));
-        gtk_file_dialog_open(fileDialog, gtkMainWindow_, nullptr, openFileCallback, nullptr);
+        openFileDialog(OpenFileDialogType::OPEN);
+    }
+    else if (g_str_equal(actionName, "save")) {
+        openFileDialog(OpenFileDialogType::SAVE);
     }
     else if (g_str_equal(actionName, "close")) {
         gtk_window_close(gtkMainWindow_);
