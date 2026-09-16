@@ -33,8 +33,11 @@ static void activate(GtkApplication* app, gpointer data) {
 
     auto* actionGroup = g_simple_action_group_new();
     auto* openFileAction = g_simple_action_new("openFile", nullptr);
+    auto* closeAction = g_simple_action_new("close", nullptr);
     g_signal_connect(openFileAction, "activate", G_CALLBACK(onClickMenu), nullptr);
+    g_signal_connect(closeAction, "activate", G_CALLBACK(onClickMenu), nullptr);
     g_action_map_add_action(G_ACTION_MAP(actionGroup), G_ACTION(openFileAction));
+    g_action_map_add_action(G_ACTION_MAP(actionGroup), G_ACTION(closeAction));
     gtk_widget_insert_action_group(mainWindowWidget_, "menu", G_ACTION_GROUP(actionGroup));
 
     GtkWidget* vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
@@ -69,17 +72,23 @@ static void openFileCallback(GObject* object, GAsyncResult* result, gpointer dat
 void onClickMenu(GtkWidget *widget, gpointer data) {
     auto* action = G_SIMPLE_ACTION(widget);
     if (action == nullptr) return;
+    auto* actionName = g_action_get_name(G_ACTION(action));
+    if (actionName == nullptr) return;
 
-    GtkFileDialog* fileDialog = gtk_file_dialog_new();
+    if (g_str_equal(actionName, "openFile")) {
+        GtkFileDialog* fileDialog = gtk_file_dialog_new();
 
-    GListStore* listStore = g_list_store_new(GTK_TYPE_FILE_FILTER);
-    GtkFileFilter* fileFilter = gtk_file_filter_new();
-    gtk_file_filter_set_name(fileFilter, "テキストファイル");
-    gtk_file_filter_add_suffix(fileFilter, "txt");
+        GListStore* listStore = g_list_store_new(GTK_TYPE_FILE_FILTER);
+        GtkFileFilter* fileFilter = gtk_file_filter_new();
+        gtk_file_filter_set_name(fileFilter, "テキストファイル");
+        gtk_file_filter_add_suffix(fileFilter, "txt");
 
-    g_list_store_append(listStore, fileFilter);
+        g_list_store_append(listStore, fileFilter);
 
-    gtk_file_dialog_set_filters(fileDialog, G_LIST_MODEL(listStore));
-    gtk_file_dialog_open(fileDialog, gtkMainWindow_, nullptr, openFileCallback, nullptr);
-
+        gtk_file_dialog_set_filters(fileDialog, G_LIST_MODEL(listStore));
+        gtk_file_dialog_open(fileDialog, gtkMainWindow_, nullptr, openFileCallback, nullptr);
+    }
+    else if (g_str_equal(actionName, "close")) {
+        gtk_window_close(gtkMainWindow_);
+    }
 }
