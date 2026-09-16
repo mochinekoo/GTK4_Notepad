@@ -11,6 +11,7 @@ namespace {
 
 static void activate(GtkApplication* app, gpointer data);
 static void onClickMenu(GtkWidget* widget, gpointer data);
+static void onEvent(GtkWidget* widget, gpointer data);
 
 // TIP コードを<b>Run</b>するには、<shortcut actionId="Run"/> を押すか、ガターにある <icon src="AllIcons.Actions.Execute"/> アイコンをクリックします。
 
@@ -52,6 +53,12 @@ static void activate(GtkApplication* app, gpointer data) {
 
     gtk_box_append(GTK_BOX(vbox), menuBar);
 
+    GtkWidget* textView = gtk_text_view_new();
+    auto* textBuffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(textView));
+
+    g_signal_connect(textBuffer, "insert-text", G_CALLBACK(onEvent), nullptr);
+    gtk_box_append(GTK_BOX(vbox), textView);
+
     gtk_window_set_child(gtkMainWindow_, vbox);
 
     gtk_window_present(gtkMainWindow_);
@@ -90,5 +97,13 @@ void onClickMenu(GtkWidget *widget, gpointer data) {
     }
     else if (g_str_equal(actionName, "close")) {
         gtk_window_close(gtkMainWindow_);
+    }
+}
+
+void onEvent(GtkWidget* widget, gpointer data) {
+    auto* textView = GTK_TEXT_VIEW(widget);
+    auto* textBuffer = GTK_TEXT_BUFFER(widget);
+    if (textBuffer != nullptr) {
+        gtk_window_set_title(gtkMainWindow_, "メモ帳（*）");
     }
 }
