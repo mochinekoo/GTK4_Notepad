@@ -5,9 +5,11 @@ namespace {
     const int DEFAULT_WIDTH = 300, DEFAULT_HEIGHT = 300;
     GtkApplication* gtkApplication_ = nullptr;
     GtkWindow* gtkMainWindow_ = nullptr;
+    GtkWidget* mainWindowWidget_ = nullptr;
 }
 
 static void activate(GtkApplication* app, gpointer data);
+static void onClickMenu(GtkWidget* widget, gpointer data);
 
 // TIP コードを<b>Run</b>するには、<shortcut actionId="Run"/> を押すか、ガターにある <icon src="AllIcons.Actions.Execute"/> アイコンをクリックします。
 
@@ -22,11 +24,17 @@ int main(int argc, char** argv) {
 }
 
 static void activate(GtkApplication* app, gpointer data) {
-    GtkWidget* window = gtk_application_window_new(app);
-    gtkMainWindow_ = GTK_WINDOW(window);
+    mainWindowWidget_ = gtk_application_window_new(app);
+    gtkMainWindow_ = GTK_WINDOW(mainWindowWidget_);
 
     gtk_window_set_title(gtkMainWindow_, "メモ帳");
     gtk_window_set_default_size(gtkMainWindow_, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+
+    auto* actionGroup = g_simple_action_group_new();
+    auto* openFileAction = g_simple_action_new("openFile", nullptr);
+    g_signal_connect(openFileAction, "activate", G_CALLBACK(onClickMenu), nullptr);
+    g_action_map_add_action(G_ACTION_MAP(actionGroup), G_ACTION(openFileAction));
+    gtk_widget_insert_action_group(mainWindowWidget_, "menu", G_ACTION_GROUP(actionGroup));
 
     GtkWidget* vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 
@@ -40,7 +48,11 @@ static void activate(GtkApplication* app, gpointer data) {
 
     gtk_box_append(GTK_BOX(vbox), menuBar);
 
-    gtk_window_set_child(GTK_WINDOW(window), vbox);
+    gtk_window_set_child(gtkMainWindow_, vbox);
 
-    gtk_window_present(GTK_WINDOW(window));
+    gtk_window_present(gtkMainWindow_);
+}
+
+void onClickMenu(GtkWidget *widget, gpointer data) {
+    g_print("aa");
 }
