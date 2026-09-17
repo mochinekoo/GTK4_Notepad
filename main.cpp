@@ -10,17 +10,13 @@ namespace {
     GtkWindow* gtkMainWindow_ = nullptr;
     GtkWidget* mainWindowWidget_ = nullptr;
     GtkTextBuffer* textBuffer_ = nullptr;
-
-    enum class OpenFileDialogType {
-        OPEN,
-        SAVE
-    };
 }
 
 static void activate(GtkApplication* app, gpointer data);
 static void onClickMenu(GtkWidget* widget, gpointer data);
 static void onEvent(GtkWidget* widget, gpointer data);
 static void openFileDialog();
+static void saveFileDialog();
 
 // TIP コードを<b>Run</b>するには、<shortcut actionId="Run"/> を押すか、ガターにある <icon src="AllIcons.Actions.Execute"/> アイコンをクリックします。
 
@@ -77,7 +73,7 @@ static void activate(GtkApplication* app, gpointer data) {
     gtk_window_present(gtkMainWindow_);
 }
 
-void openFileDialog(OpenFileDialogType type) {
+void openFileDialog() {
     GtkFileDialog* fileDialog = gtk_file_dialog_new();
 
     GListStore* listStore = g_list_store_new(GTK_TYPE_FILE_FILTER);
@@ -93,29 +89,46 @@ void openFileDialog(OpenFileDialogType type) {
         if (fileDialog == nullptr) return;
         GError* error = nullptr;
         GFile* file = gtk_file_dialog_open_finish(fileDialog, result, &error);
-        OpenFileDialogType type = (OpenFileDialogType) GPOINTER_TO_INT(data);
-
         if (file == nullptr) return;
         char* path = g_file_get_path(file);
-        if (type == OpenFileDialogType::OPEN) {
-            std::string text = "";
-            std::ifstream inputFile(path);
-            inputFile >> text;
-            gtk_text_buffer_set_text(textBuffer_, text.data(), text.size());
-        }
-        else if (type == OpenFileDialogType::SAVE) {
-            GtkTextIter startItr;
-            gtk_text_buffer_get_start_iter(textBuffer_, &startItr);
-            GtkTextIter endItr;
-            gtk_text_buffer_get_end_iter(textBuffer_, &endItr);
-            char* text = gtk_text_buffer_get_text(textBuffer_, &startItr, &endItr, false);
-            //g_print(text);
-            std::ofstream outputFile(path);
-            outputFile << text;
-            g_print("Saved\n");
-        }
+        std::string text = "";
+        std::ifstream inputFile(path);
+        inputFile >> text;
+        gtk_text_buffer_set_text(textBuffer_, text.data(), text.size());
+    }, nullptr);
+}
 
-    }, GINT_TO_POINTER((int)type));
+void saveFileDialog() {
+    GtkFileDialog* fileDialog = gtk_file_dialog_new();
+
+    GListStore* listStore = g_list_store_new(GTK_TYPE_FILE_FILTER);
+    GtkFileFilter* fileFilter = gtk_file_filter_new();
+    gtk_file_filter_set_name(fileFilter, "テキストファイル");
+    gtk_file_filter_add_suffix(fileFilter, "txt");
+
+    g_list_store_append(listStore, fileFilter);
+
+    gtk_file_dialog_set_filters(fileDialog, G_LIST_MODEL(listStore));
+
+    gtk_file_dialog_save(fileDialog, gtkMainWindow_, nullptr, [](GObject* object, GAsyncResult* result, gpointer data) {
+        GtkFileDialog* fileDialog = GTK_FILE_DIALOG(object);
+        if (fileDialog == nullptr) return;
+        GError* error = nullptr;
+        GFile* file = gtk_file_dialog_save_finish(fileDialog, result, &error);
+        if (file == nullptr) return;
+        char* path = g_file_get_path(file);
+
+        GtkTextIter startItr;
+        gtk_text_buffer_get_start_iter(textBuffer_, &startItr);
+        GtkTextIter endItr;
+        gtk_text_buffer_get_end_iter(textBuffer_, &endItr);
+        char* text = gtk_text_buffer_get_text(textBuffer_, &startItr, &endItr, false);
+        //g_print(text);
+        std::ofstream outputFile(path);
+        outputFile << text;
+        g_print("Saved\n");
+
+    }, nullptr);
 }
 
 void onClickMenu(GtkWidget *widget, gpointer data) {
@@ -125,10 +138,10 @@ void onClickMenu(GtkWidget *widget, gpointer data) {
     if (actionName == nullptr) return;
 
     if (g_str_equal(actionName, "openFile")) {
-        openFileDialog(OpenFileDialogType::OPEN);
+        openFileDialog();
     }
     else if (g_str_equal(actionName, "save")) {
-        openFileDialog(OpenFileDialogType::SAVE);
+        saveFileDialog();
     }
     else if (g_str_equal(actionName, "close")) {
         gtk_window_close(gtkMainWindow_);
